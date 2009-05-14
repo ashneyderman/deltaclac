@@ -7,6 +7,13 @@
   <version>0.3-SNAPSHOT</version>
   <name>jdiff</name>
 
+  <scm>
+    <connection>scm:svn:https://deltaclac.googlecode.com/svn</connection>
+    <developerConnection>scm:svn:https://deltaclac.googlecode.com/svn</developerConnection>
+    <tag>HEAD</tag>
+    <url>http://code.google.com/p/deltaclac/source/browse</url>
+  </scm>
+
   <build>
     <pluginManagement>
       <plugins>
