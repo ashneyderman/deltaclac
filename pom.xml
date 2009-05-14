@@ -12,7 +12,27 @@
     <url>http://code.google.com/p/deltaclac/source/browse</url>
   </scm>
 
+  <distributionManagement>
+    <repository>
+      <id>deltaclac-releases</id>
+      <name>your-reposiotory-name</name>
+      <url>dav:https://deltaclac.googlecode.com/svn/maven/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>deltaclac-snapshots</id>
+      <url>dav:https://deltaclac.googlecode.com/svn/maven/snapshots</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
+  </distributionManagement>
+
   <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-webdav</artifactId>
+        <version>1.0-beta-2</version>
+      </extension>
+    </extensions>
     <pluginManagement>
       <plugins>
         <plugin>
