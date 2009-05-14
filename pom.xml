@@ -3,14 +3,13 @@
   <groupId>net.groovysips.jdiff</groupId>
   <artifactId>jdiff</artifactId>
   <packaging>jar</packaging>
-  <version>0.3</version>
+  <version>0.4-SNAPSHOT</version>
   <name>jdiff</name>
 
   <scm>
-    <connection>scm:svn:https://deltaclac.googlecode.com/svn/tags/jdiff_0_3</connection>
-    <developerConnection>scm:svn:https://deltaclac.googlecode.com/svn/tags/jdiff_0_3</developerConnection>
-    <tag>HEAD</tag>
-    <url>http://code.google.com/p/deltaclac/source/browse/tags/jdiff_0_3</url>
+    <connection>scm:svn:https://deltaclac.googlecode.com/svn</connection>
+    <developerConnection>scm:svn:https://deltaclac.googlecode.com/svn</developerConnection>
+    <url>http://code.google.com/p/deltaclac/source/browse</url>
   </scm>
 
   <build>
