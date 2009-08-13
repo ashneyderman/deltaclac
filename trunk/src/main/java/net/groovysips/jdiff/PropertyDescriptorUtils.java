@@ -21,9 +21,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.ArrayList;
 import static net.groovysips.jdiff.StringUtils.buildLogableString;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * Various property descriptor utilities. This class relies on spring to fetch property descriptions.
@@ -33,6 +36,8 @@ import org.springframework.util.StringUtils;
  */
 public abstract class PropertyDescriptorUtils
 {
+
+    private static final Log LOG = LogFactory.getLog(PropertyDescriptorUtils.class);
 
     private static String[] sysprops = { "class" };
 
@@ -52,10 +57,14 @@ public abstract class PropertyDescriptorUtils
         }
 
         Method readMethod = propDesc.getReadMethod();
+        if( readMethod == null )
+        {
+            readMethod = seeIfWeNeedToSetCustomBooleanGetter( source.getClass(), propDesc );
+        }
 
         if( readMethod == null )
         {
-            throw new RuntimeException( "Unable to find read method on the source object." );
+            throw new RuntimeException( "Unable to find read method on the source object." + propDesc.getName() );
         }
 
         try
@@ -84,6 +93,15 @@ public abstract class PropertyDescriptorUtils
         }
 
         PropertyDescriptor propDesc = fetchDescriptor( source, propertyName );
+
+        if(propDesc == null)
+        {
+            LOG.error( buildLogableString( "property descriptor is null.",
+                                           new Object[][] {
+                                               {"source",source},
+                                               {"propertyName",propertyName}
+                                           } ) );
+        }
 
         Method readMethod = propDesc.getReadMethod();
 
@@ -121,7 +139,13 @@ public abstract class PropertyDescriptorUtils
 
         if( writeMethod == null )
         {
-            throw new RuntimeException( "Unable to find a write method on the target object." );
+            String msg = buildLogableString( "Unable to find a write method for property.",
+                                             new Object[][] {
+                                                 {"propDesc.name",propDesc.getName()},
+                                                 {"target.class", target.getClass()},
+                                                 {"value",value}
+                                             } );
+            throw new RuntimeException( msg );
         }
 
         try
@@ -196,7 +220,7 @@ public abstract class PropertyDescriptorUtils
         return propertyType.isPrimitive() ||
                propertyType.isAssignableFrom( Boolean.class ) ||
                propertyType.isAssignableFrom( String.class ) ||
-               propertyType.isAssignableFrom( Number.class ) ||
+               Number.class.isAssignableFrom( propertyType ) ||
                propertyType.isAssignableFrom( Date.class ) ||
                propertyType.isEnum();
     }
@@ -223,10 +247,83 @@ public abstract class PropertyDescriptorUtils
         return false;
     }
 
+    /**
+     *
+     * @param target
+     * @param excludes
+     * @return array of prop descriptors
+     */
+    public static final PropertyDescriptor[] getPropertyDescriptors( Object target, List<String> excludes)
+    {
+        if (excludes == null || excludes.isEmpty())
+        {
+            return placeSystemPropertiesOnTop( BeanUtils.getPropertyDescriptors( target.getClass() ) );
+        }
+
+        PropertyDescriptor[] descriptors = BeanUtils.getPropertyDescriptors( target.getClass() );
+        List<PropertyDescriptor> lDescriptors = Arrays.asList( descriptors );
+        List<PropertyDescriptor> result = new ArrayList<PropertyDescriptor>();
+        for( PropertyDescriptor d : lDescriptors )
+        {
+            if (excludes.contains( d.getName() ) )
+            {
+                continue;
+            }
+            result.add( d );
+        }
+
+        return placeSystemPropertiesOnTop( result.toArray( new PropertyDescriptor[0] ));
+    }
+
+    /**
+     *
+     * @param target
+     * @return array of prop descriptors
+     */
     public static final PropertyDescriptor[] getPropertyDescriptors( Object target )
     {
-        // TODO (Shneyderman - May 8, 2009) : potential optimization to cache the results of the call
         return placeSystemPropertiesOnTop( BeanUtils.getPropertyDescriptors( target.getClass() ) );
+    }
+
+    /**
+     *
+     * @param obj
+     * @param propertyName
+     * @return prop descriptor
+     */
+    public static final PropertyDescriptor fetchDescriptor( Object obj, String propertyName )
+    {
+        if( obj == null )
+        {
+            return null;
+        }
+
+        if( !StringUtils.hasText( propertyName ) )
+        {
+            return null;
+        }
+
+        return BeanUtils.getPropertyDescriptor( obj.getClass(), propertyName );
+    }
+
+    // HELPERS
+    private static Method seeIfWeNeedToSetCustomBooleanGetter( Class hostObjectClass, PropertyDescriptor sourceFieldDesc )
+    {
+        if( sourceFieldDesc.getPropertyType() != Boolean.class )
+        {
+            return null;
+        }
+
+        String altReader = "is" + StringUtils.capitalize( sourceFieldDesc.getName() );
+        try
+        {
+            return hostObjectClass.getDeclaredMethod( altReader );
+        }
+        catch( Exception e )
+        {
+        }
+
+        return null;
     }
 
     private static final PropertyDescriptor[] placeSystemPropertiesOnTop( PropertyDescriptor[] arg )
@@ -251,21 +348,6 @@ public abstract class PropertyDescriptorUtils
         } );
 
         return (PropertyDescriptor[]) list.toArray( new PropertyDescriptor[list.size()] );
-    }
-
-    public static final PropertyDescriptor fetchDescriptor( Object obj, String propertyName )
-    {
-        if( obj == null )
-        {
-            return null;
-        }
-
-        if( !StringUtils.hasText( propertyName ) )
-        {
-            return null;
-        }
-
-        return BeanUtils.getPropertyDescriptor( obj.getClass(), propertyName );
     }
 
 }

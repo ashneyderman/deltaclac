@@ -15,6 +15,9 @@
 package net.groovysips.jdiff.delta;
 
 import java.io.PrintStream;
+import java.io.Writer;
+import java.io.PrintWriter;
+import java.io.IOException;
 import java.util.Stack;
 import net.groovysips.jdiff.CompositeDelta;
 import net.groovysips.jdiff.Delta;
@@ -29,22 +32,36 @@ import net.groovysips.jdiff.DeltaVisitor;
 public class DeltaPrinter implements DeltaVisitor
 {
 
-    private PrintStream out;
+    private Writer writer;
 
     public DeltaPrinter( PrintStream out )
     {
-        this.out = out;
+        this.writer = new PrintWriter( out );
     }
 
-    Stack<Delta> deltaStack = new Stack<Delta>();
+    public DeltaPrinter( Writer writer )
+    {
+        this.writer = writer;
+    }
+
+    private Stack<Delta> deltaStack = new Stack<Delta>();
 
     public void visit( Delta root )
     {
+        try
+        {
         indent();
 
         deltaStack.push( root );
 
-        out.println( root );
+            writer.write( root.toString() );
+            writer.write( "\n" );
+            writer.flush();
+    }
+        catch( IOException e )
+        {
+            System.err.println( "Unable to write to the writer." );
+        }
     }
 
     public void visitChild( Delta child )
@@ -55,9 +72,18 @@ public class DeltaPrinter implements DeltaVisitor
             return;
         }
 
+        try
+        {
         indent();
 
-        out.println( child );
+            writer.write( child.toString() );
+            writer.write( "\n" );
+            writer.flush();
+    }
+        catch( IOException e )
+        {
+            System.err.println( "Unable to write to the writer." );
+        }
     }
 
     public void endVisit( CompositeDelta parent )
@@ -66,11 +92,13 @@ public class DeltaPrinter implements DeltaVisitor
     }
 
     private void indent()
+        throws IOException
     {
         for( int i = 0; i < deltaStack.size(); i++ )
         {
-            out.print( "\t" );
+            writer.write( "\t" );
         }
+        writer.flush();
     }
 
 

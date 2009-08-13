@@ -14,33 +14,31 @@
 */
 package net.groovysips.jdiff.delta;
 
+import java.util.Collection;
+import java.util.Map;
+
 /**
- * A composite delta that has no modifications of its own. The only effective changes are made by its children.
+ * TODO: provide javadoc.
  *
  * @author Alex Shneyderman
- * @since 0.3
+ * @since 0.5
  */
-public class SimpleContainerDelta extends AbstractCompositeDelta
+public class NullReturningCriteria implements FinderCriteria
 {
-
-    private String propertyName;
-
-    public String getPropertyName()
+    public Object find( Collection collection )
     {
-        return propertyName;
+        return null;
     }
 
-    public SimpleContainerDelta( String propertyName )
+    public Map<String, Object> critValues()
     {
-        this.propertyName = propertyName;
+        return null;
     }
 
     public String toString()
     {
-        return "SimpleContainerDelta{" +
-               "propertyName='" + propertyName + "';" +
-               "numberOfProperties=" + ( children() == null ? "0" : children().size() ) +
-               '}';
+        return "NullReturningCriteria{}";
     }
+
 
 }
