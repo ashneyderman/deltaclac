@@ -19,6 +19,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.ArrayList;
 import net.groovysips.jdiff.Delta;
 import net.groovysips.jdiff.DeltaBuilder;
 import net.groovysips.jdiff.PropertyDescriptorUtils;
@@ -46,6 +49,18 @@ public class DefaultDeltaBuilder implements DeltaBuilder
         this.excludes = excludes;
     }
 
+    private Map<Class, List<String>> refilledCollection = new HashMap<Class, List<String>>();
+
+    public Map<Class, List<String>> getRefilledCollection()
+    {
+        return refilledCollection;
+    }
+
+    public void setRefilledCollection( Map<Class, List<String>> refilledCollection )
+    {
+        this.refilledCollection = refilledCollection;
+    }
+
     private Map<Class, Map<String, String>> writeMethodOverrides = new HashMap<Class, Map<String, String>>();
 
     public Map<Class, Map<String, String>> getWriteMethodOverrides()
@@ -58,6 +73,17 @@ public class DefaultDeltaBuilder implements DeltaBuilder
         this.writeMethodOverrides = writeMethodOverrides;
     }
 
+    private FinderCriteriaFactory finderCriteriaFactory;
+
+    public FinderCriteriaFactory getFinderCriteriaFactory()
+    {
+        return finderCriteriaFactory;
+    }
+
+    public void setFinderCriteriaFactory( FinderCriteriaFactory finderCriteriaFactory )
+    {
+        this.finderCriteriaFactory = finderCriteriaFactory;
+    }
     // INTERFACE.
     /**
      * Calculates delta between two java beans.
@@ -123,7 +149,9 @@ public class DefaultDeltaBuilder implements DeltaBuilder
     {
         PropertyDescriptor[] modifiedObjectPropertyDescs = EMPTY_PROPERTY_DESCRIPTORS_ARRAY;
 
-        modifiedObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( modified );
+        List<String> excludedProps = findExcludedProperties(modified.getClass());
+
+        modifiedObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( modified, excludedProps );
 
         AbstractCompositeDelta result = null;
 
@@ -162,11 +190,13 @@ public class DefaultDeltaBuilder implements DeltaBuilder
 
         PropertyDescriptor[] originalObjectPropertyDescs = EMPTY_PROPERTY_DESCRIPTORS_ARRAY;
 
-        modifiedObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( modified );
+        List<String> excludedProps = findExcludedProperties(modified.getClass());
 
-        originalObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( original );
+        modifiedObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( modified, excludedProps );
 
-        AbstractCompositeDelta result = new SimpleContainerDelta( propertyeName );
+        originalObjectPropertyDescs = PropertyDescriptorUtils.getPropertyDescriptors( original, excludedProps );
+
+        AbstractCompositeDelta result = new SimpleContainerDelta(propertyeName);
 
         for( int i = 0; i < modifiedObjectPropertyDescs.length; i++ )
         {
@@ -211,14 +241,15 @@ public class DefaultDeltaBuilder implements DeltaBuilder
             return new PropertyUpdateDelta( propertyDesc.getName(), propNewValue, null, propertyWriteMethodName );
         }
 
-        if( propertyType.isArray() )
+        if( propertyType.isArray() )  // TODO (Shneyderman - Jun 13, 2009) : we do not do arrays yet.
         {
             return Delta.NULL;
         }
 
-        if( propertyType.isAssignableFrom( Collection.class ) )
+        if( Collection.class.isAssignableFrom( propertyType ) )
         {
-            return Delta.NULL;
+            CollectionDelta collDelta = createNewCollectionDelta( (Collection) propNewValue, propertyDesc.getName(), propertyType );
+            return (collDelta == null || collDelta.children() == null || collDelta.children().isEmpty()) ? Delta.NULL : collDelta;
         }
 
         // composite
@@ -233,13 +264,44 @@ public class DefaultDeltaBuilder implements DeltaBuilder
 
         Object modifiedPropVal = PropertyDescriptorUtils.read( modified, modifiedPD );
 
+        Class propertyType = modifiedPD.getPropertyType();
+        if( Collection.class.isAssignableFrom( propertyType ) )
+        {
+            if (modifiedPropVal == null && originalPropVal == null)
+            {
+                return Delta.NULL;
+            }
+
+            if ((modifiedPropVal != null && ((Collection) modifiedPropVal).isEmpty()) &&
+                (originalPropVal != null && ((Collection) originalPropVal).isEmpty()))
+            {
+                return Delta.NULL;
+            }
+
+            CollectionDelta collDelta = null;
+            if (originalPropVal == null)
+            {
+                collDelta = createNewCollectionDelta( (Collection) modifiedPropVal, modifiedPD.getName(), modifiedPD.getPropertyType() );
+            }
+            else if ( isRefilledCollection( original.getClass(), modifiedPD.getName() ) )
+            {
+                collDelta = createRefillCollectionDelta( (Collection) modifiedPropVal, modifiedPD.getName(), modifiedPD.getPropertyType() );
+            }
+            else
+            {
+                collDelta = createOverlayCollectionDelta( (Collection) originalPropVal, (Collection) modifiedPropVal, modifiedPD.getName(), originalPD.getPropertyType() );
+            }
+
+            return (collDelta == null || collDelta.children() == null || collDelta.children().isEmpty()) ? Delta.NULL : collDelta;
+        }
+
         if( ObjectUtils.nullSafeEquals( originalPropVal, modifiedPropVal ) )
         {
             return Delta.NULL;
         }
 
-        Class propertyType = modifiedPD.getPropertyType();
-        if( PropertyDescriptorUtils.isPrimitive( propertyType ) )
+        if( PropertyDescriptorUtils.isPrimitive( propertyType ) ||
+            modifiedPropVal == null)
         {
             String propertyWriteMethodName = findPropertyWriteMethodOverride( original != null ? original : modified,
                                                                               originalPD != null ? originalPD : modifiedPD );
@@ -252,20 +314,164 @@ public class DefaultDeltaBuilder implements DeltaBuilder
             return Delta.NULL;
         }
 
-        if( propertyType.isAssignableFrom( Collection.class ) )
-        {
-            return Delta.NULL;
-        }
-
         // it must be a composite.
         return build( originalPropVal, modifiedPropVal, originalPD );
     }
 
+    private boolean isRefilledCollection( Class clazz, String name )
+    {
+        if (clazz == null || name == null)
+        {
+            return false;
+        }
+
+        List<String> pNames = findRefilledCollectionProperties( clazz );
+
+        if (pNames == null)
+        {
+            return false;
+        }
+
+        return pNames.contains( name );
+    }
+
+    private CollectionDelta createRefillCollectionDelta(Collection modCollection, String propertyName, Class collectionClazz)
+    {
+        Class collectionType = determineCollectionType(collectionClazz);
+        CollectionDelta result = new CollectionDelta(propertyName, collectionType);
+        result.addChild( new ClearAllDelta() );
+        if (modCollection == null)
+        {
+            return result;
+        }
+
+        for( Object modObj : modCollection )
+        {
+            Delta dToAdd = null;
+
+            if ( modObj != null && PropertyDescriptorUtils.isPrimitive( modObj.getClass() ))
+            {
+                dToAdd = new NewItemDelta( new PrimitiveValueDelta( modObj ) );
+            }
+            else
+            {
+                Delta itemDelegateDelta = build( null, modObj );
+                if (Delta.NULL != itemDelegateDelta)
+                {
+                    dToAdd = new NewItemDelta( (JavaBeanDelta) itemDelegateDelta ) ;
+                }
+            }
+
+            if (dToAdd != null)
+            {
+                result.addChild( dToAdd );
+            }
+        }
+
+        return result;
+    }
+
+    private CollectionDelta createNewCollectionDelta(Collection modCollection, String propertyName, Class collectionClazz)
+    {
+        Class collectionType = determineCollectionType(collectionClazz);
+        CollectionDelta result = new CollectionDelta(propertyName, collectionType );
+
+        for( Object modObj : modCollection )
+        {
+            if ( modObj != null && PropertyDescriptorUtils.isPrimitive( modObj.getClass() ))
+            {
+                result.addChild( new NewItemDelta( new PrimitiveValueDelta( modObj ) ) );
+            }
+            else
+            {
+                Delta itemDelegateDelta = build( null, modObj );
+                if (Delta.NULL != itemDelegateDelta)
+                {
+                    result.addChild( new NewItemDelta( (JavaBeanDelta) itemDelegateDelta ) );
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private Class determineCollectionType( Class collectionClazz )
+    {
+        if (Set.class.isAssignableFrom( collectionClazz ))
+        {
+            return HashSet.class;
+        }
+        else if (List.class.isAssignableFrom( collectionClazz ))
+        {
+            return ArrayList.class;
+        }
+        else if ( Map.class.isAssignableFrom( collectionClazz ))
+        {
+            return HashMap.class;
+        }
+
+        return ArrayList.class;
+    }
+
+    private CollectionDelta createOverlayCollectionDelta(Collection origCollection, Collection modCollection, String propertyName, Class collectionClazz)
+    {
+        Class collectionType = determineCollectionType(collectionClazz);
+        CollectionDelta result = new CollectionDelta(propertyName, collectionType );
+
+        if(modCollection == null)
+        {
+            return result;
+        }
+
+        for( Object modObj : modCollection )
+        {
+            FinderCriteria crit = finderCriteriaFactory.create( modObj );
+            Object origObj = crit.find( origCollection );
+            if (origObj == null)
+            {
+                if ( modObj != null && PropertyDescriptorUtils.isPrimitive( modObj.getClass() ))
+                {
+                    result.addChild( new NewItemDelta( new PrimitiveValueDelta( modObj ) ) );
+                }
+                else
+                {
+                    Delta itemDelegateDelta = build( null, modObj );
+                    if (Delta.NULL != itemDelegateDelta)
+                    {
+                        result.addChild( new NewItemDelta( (JavaBeanDelta) itemDelegateDelta ) );
+                    }
+                }
+            }
+            else
+            {
+                Delta delta = build( origObj, modObj );
+                if (Delta.NULL != delta)
+                {
+                    result.addChild( new UpdateItemDelta( (SimpleContainerDelta) delta, crit ) );
+                }
+            }
+        }
+
+        // remove original items that are not in the modified collection.
+        // TODO (Shneyderman - Jun 30, 2009) : we do not use this feature as all of our collections are refill or add only
+        //                                     (items for example). So, we need some sane way of dealing with this.
+        //        for( Object origObj : origCollection )
+        //        {
+        //            FinderCriteria crit = finderCriteriaFactory.create( origObj );
+        //            Object modObj = crit.find( modCollection );
+        //            if (modObj == null)
+        //            {
+        //                result.addChild( new RemoveItemDelta( crit ) );
+        //            }
+        //        }
+
+        return result;
+    }
     private String findPropertyWriteMethodOverride( Object object, PropertyDescriptor propertyDescriptor )
     {
         if( object == null || propertyDescriptor == null )
         {
-            throw new IllegalArgumentException( "None of the argumetns can be null." );
+            return null;
         }
 
         Class objClass = object.getClass();
@@ -274,12 +480,112 @@ public class DefaultDeltaBuilder implements DeltaBuilder
 
         Map<String, String> classOverrides = writeMethodOverrides.get( objClass );
 
-        if( classOverrides != null )
+        if( classOverrides != null && classOverrides.get( propName ) != null )
         {
             return classOverrides.get( propName );
+        }
+
+        // let's see if there is any superclass in that map.
+        Set<Class> keys = writeMethodOverrides.keySet();
+
+        for( Class keyClass : keys )
+        {
+            if( keyClass == objClass )
+            {
+                continue;
+            }
+
+            if( keyClass.isAssignableFrom( objClass ) )
+            {
+                Map<String, String> superClass = writeMethodOverrides.get( keyClass );
+
+                if (superClass != null && superClass.get( propName ) != null)
+                {
+                    return superClass.get( propName );
+                }
+            }
         }
 
         return null;
     }
 
+    private List<String> findExcludedProperties( Class clazz )
+    {
+        if (excludes == null || clazz == null)
+        {
+            return null;
+        }
+
+        Set<String> result = new HashSet<String>();
+
+        List<String> directClass = excludes.get( clazz );
+
+        if( directClass != null )
+        {
+            result.addAll(directClass);
+        }
+
+        // let's see if there is any superclass in that map.
+        Set<Class> keys = excludes.keySet();
+
+        for( Class keyClass : keys )
+        {
+            if( keyClass.isAssignableFrom( clazz ) ) //&& keyClass != clazz )
+            {
+                List<String> superClass = excludes.get( keyClass );
+
+                if (superClass != null)
+                {
+                    result.addAll( superClass );
+                }
+            }
+        }
+
+        if (result.isEmpty())
+        {
+            return null;
+        }
+
+        return new ArrayList<String>( result );
+    }
+
+    private List<String> findRefilledCollectionProperties( Class clazz )
+    {
+        if (refilledCollection == null || clazz == null)
+        {
+            return null;
+        }
+
+        Set<String> result = new HashSet<String>();
+
+        List<String> directClass = refilledCollection.get( clazz );
+
+        if( directClass != null )
+        {
+            result.addAll(directClass);
+        }
+
+        // let's see if there is any superclass in that map.
+        Set<Class> keys = refilledCollection.keySet();
+
+        for( Class keyClass : keys )
+        {
+            if( keyClass.isAssignableFrom( clazz ) ) //&& keyClass != clazz )
+            {
+                List<String> superClass = refilledCollection.get( keyClass );
+
+                if (superClass != null)
+                {
+                    result.addAll( superClass );
+                }
+            }
+        }
+
+        if (result.isEmpty())
+        {
+            return null;
+        }
+
+        return new ArrayList<String>( result );
+    }
 }

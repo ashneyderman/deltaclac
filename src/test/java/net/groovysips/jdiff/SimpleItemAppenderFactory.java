@@ -12,14 +12,28 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package net.groovysips.jdiff.delta;
+package net.groovysips.jdiff;
+
+import net.groovysips.jdiff.delta.ItemAppenderFactory;
+import net.groovysips.jdiff.delta.ItemAppender;
+import java.util.Stack;
+import java.util.Collection;
 
 /**
  * TODO: provide javadoc.
  *
  * @author Alex Shneyderman
- * @since 0.3
+ * @since 0.5
  */
-public class NewCollectionItem
+public class SimpleItemAppenderFactory implements ItemAppenderFactory
 {
+    public ItemAppender create( Object item )
+    {
+        return new ItemAppender() {
+            public void append( Stack stack, Collection collection, Object item )
+            {
+                collection.add( item );
+            }
+        };
+    }
 }

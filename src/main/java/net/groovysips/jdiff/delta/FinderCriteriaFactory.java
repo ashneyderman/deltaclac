@@ -15,9 +15,14 @@
 package net.groovysips.jdiff.delta;
 
 /**
+ * TODO: provide javadoc.
+ *
  * @author Alex Shneyderman
- * @since 0.3
+ * @since 0.5
  */
-public class UpdatCollectionItem
+public interface FinderCriteriaFactory
 {
+
+    FinderCriteria create( Object item );
+
 }

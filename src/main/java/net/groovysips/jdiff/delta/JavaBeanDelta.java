@@ -65,15 +65,15 @@ public class JavaBeanDelta extends AbstractCompositeDelta
         }
         catch( Exception e )
         {
-            throw new RuntimeException( "Unable to instantiate class " + rootObjectClass.getName(), e );
+            throw new RuntimeException( "Unable to instantiate class " + rootObjectClass, e );
         }
     }
 
     @Override public String toString()
     {
         return "BeanCreate{" +
-               "assignedToProperty='" + propertyName + '\'' +
-               ", beanClass=" + ( rootObjectClass == null ? "unknown" : rootObjectClass.getName() ) +
-               '}';
+               "assignedToProperty='" + propertyName + "'" +
+               ", beanClass='" + rootObjectClass + "'" +
+               "}";
     }
 }

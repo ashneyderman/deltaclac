@@ -15,6 +15,7 @@
 package net.groovysips.jdiff;
 
 import java.util.List;
+import java.util.Stack;
 
 /**
  * @author Alex Shneyderman
@@ -48,6 +49,10 @@ public class StringUtils
             {
                 sb.append( "" + ctx[ i ][ 0 ] + ": null" );
             }
+            else if(  ctx[ i ][ 1 ] instanceof Stack )
+            {
+               sb.append( "" + ctx[ i ][ 0 ] + ": " + buildLogableStringForStack( (Stack) ctx[ i ][ 1 ] ) );
+            }
             else if( ctx[ i ][ 1 ] instanceof List )
             {
                 sb.append( "" + ctx[ i ][ 0 ] + ": " + buildLogableStringForList( (List) ctx[ i ][ 1 ] ) );
@@ -61,9 +66,33 @@ public class StringUtils
         return sb.toString();
     }
 
+    /**
+     * Makes the frist letter of the string capital, leaving the rest of the string intact.
+     *
+     * @param s - string to capitalize
+     * @return capitalized argument.
+     */
+    public static final String capitalize( final String s )
+    {
+        if(s == null || s.trim().equals( "" ))
+        {
+            return s;
+        }
+
+        if(s.length() > 1)
+        {
+            return s.substring( 0, 1 ).toUpperCase() + s.substring( 1 );
+        }
+        else
+        {
+            return s.toUpperCase();
+        }
+    }
+
+    // HELPERS
     private static String buildLogableStringForList( List list )
     {
-        StringBuilder sb = new StringBuilder( "[" );
+        StringBuilder sb = new StringBuilder( "\n[" );
 
         if( list != null )
         {
@@ -79,5 +108,33 @@ public class StringUtils
 
         return sb.toString();
     }
+
+    private static String buildLogableStringForStack( Stack stack )
+    {
+        StringBuilder sb = new StringBuilder( "[" );
+
+        if( stack == null )
+        {
+            sb.append( "null" );
+        }
+        else if( stack.isEmpty() )
+        {
+            sb.append( "empty" );
+        }
+        else
+        {
+            int i = 0;
+            for( Object obj : stack )
+            {
+                sb.append( i++ > 0 ? "," : "" )
+                    .append( obj == null ? "null" : obj.toString() );
+            }
+        }
+
+        sb.append( "]" );
+
+        return sb.toString();
+    }
+
 
 }

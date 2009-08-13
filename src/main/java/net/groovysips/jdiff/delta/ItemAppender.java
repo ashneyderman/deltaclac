@@ -12,31 +12,20 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package net.groovysips.jdiff;
+package net.groovysips.jdiff.delta;
+
+import java.util.Stack;
+import java.util.Collection;
 
 /**
+ * TODO: provide javadoc.
+ *
  * @author Alex Shneyderman
- * @since 0.3
+ * @since 0.5
  */
-public interface Delta
+public interface ItemAppender
 {
 
-    /**
-     * @param visitor
-     */
-    void visit( DeltaVisitor visitor );
-
-    public static final Delta NULL = new Delta()
-    {
-        public void visit( DeltaVisitor visitor )
-        {
-            visitor.visit( this );
-        }
-
-        public String toString()
-        {
-            return "Delta.NULL";
-        }
-    };
+    void append( Stack stack, Collection collection, Object item );
 
 }

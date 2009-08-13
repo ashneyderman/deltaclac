@@ -14,12 +14,19 @@
 */
 package net.groovysips.jdiff;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import java.io.StringWriter;
+import net.groovysips.jdiff.delta.DeltaPrinter;
+
 /**
  * @author Alex Shneyderman
  * @since 0.3
  */
 public class DefaultDeltaCalculationService implements DeltaCalculationService
 {
+
+    private static final Log LOG = LogFactory.getLog(DefaultDeltaCalculationService.class);
 
     private DeltaBuilder deltaBuilder;
 
@@ -62,7 +69,16 @@ public class DefaultDeltaCalculationService implements DeltaCalculationService
 
     public Delta diff( Object original, Object modified )
     {
-        return deltaBuilder.build( original, modified );
+        Delta result = deltaBuilder.build( original, modified );
+
+        if (LOG.isDebugEnabled())
+        {
+            StringWriter w = new StringWriter( );
+            result.visit( new DeltaPrinter( w ) );
+            LOG.debug( "Diff result - \n" + w.getBuffer().toString() );
+        }
+        
+        return result;
     }
 
     public Object apply( Object object, Delta delta )

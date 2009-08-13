@@ -14,33 +14,35 @@
 */
 package net.groovysips.jdiff.delta;
 
+import net.groovysips.jdiff.CompositeDelta;
+
 /**
- * A composite delta that has no modifications of its own. The only effective changes are made by its children.
+ * TODO: provide javadoc.
  *
  * @author Alex Shneyderman
- * @since 0.3
+ * @since 0.5
  */
-public class SimpleContainerDelta extends AbstractCompositeDelta
+public class UpdateItemDelta extends AbstractCompositeDelta implements CompositeDelta
 {
 
-    private String propertyName;
+    private FinderCriteria finderCriteria;
 
-    public String getPropertyName()
+    public FinderCriteria getFinderCriteria()
     {
-        return propertyName;
+        return finderCriteria;
     }
 
-    public SimpleContainerDelta( String propertyName )
+    public UpdateItemDelta( SimpleContainerDelta delegate, FinderCriteria crit )
     {
-        this.propertyName = propertyName;
+        this.finderCriteria = crit;
+        addChild( delegate );
     }
 
-    public String toString()
+    @Override public String toString()
     {
-        return "SimpleContainerDelta{" +
-               "propertyName='" + propertyName + "';" +
-               "numberOfProperties=" + ( children() == null ? "0" : children().size() ) +
+        return "UpdateItemDelta{" +
+               "delegate=" + (children() != null && !children().isEmpty() ? children().get( 0 ) : null) +
+               ", finderCritera=" + finderCriteria +
                '}';
     }
-
 }

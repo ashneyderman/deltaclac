@@ -16,6 +16,7 @@ package net.groovysips.jdiff;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import org.springframework.util.ObjectUtils;
 
 
@@ -30,6 +31,8 @@ public class Person
     private Date dob;
     private int yearsInSchool;
     private Collection<Person> children;
+
+    private List<Account> accounts;
 
     private Person spouse;
 
@@ -103,6 +106,16 @@ public class Person
     public void setFirstChild( Person firstChild )
     {
         this.firstChild = firstChild;
+    }
+
+    public List<Account> getAccounts()
+    {
+        return accounts;
+    }
+
+    public void setAccounts( List<Account> accounts )
+    {
+        this.accounts = accounts;
     }
 
     @Override
