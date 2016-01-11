@@ -1,0 +1,1 @@
+A diffing utility that provides delta calculation services between java objects (java beans to be precise).
